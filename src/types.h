@@ -37,6 +37,8 @@ typedef struct {
 	UINT8 status;
 	UINT8 image_type;
 	UINT64 image_address;
+	// Interesting
+	// Where's the size?
 	UINT32 image_offset_x;
 	UINT32 image_offset_y;
 } ACPI_BGRT;

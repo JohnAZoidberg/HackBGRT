@@ -1,6 +1,37 @@
 using System;
 using System.IO;
 
+/*
+Paths
+- Bootloader: A:\\EFI\\Microsoft\\Boot\\bootmgfw.efi
+- Backup:     A:\\EFI\\HackBGRT\\bootmgfw-original.efi
+- Shim:       A:\\EFI\\HackBGRT\\bootx64.efi
+
+Installation process
+1. Mounts ESP at the first available drive letter
+2. Create directory on ESP: A:\\EFI\\HackBGRT
+3. Back up original bootloader: Copy A:\\EFI\\Microsoft\\Boot\\bootmgfw.efi to A:\\EFI\\HackBGRT\\bootmgfw-original.efi
+4. Put custom loader: Copy src\bootx64.efi to A:\\EFI\\HackBGRT\\bootmgfw.efi
+5. Add config file: Copy src\config.txt to A:\\EFI\\HackBGRT\\config.txt
+6. Add splash image: Copy src\splash.bmp to A:\\EFI\\HackBGRT\\splash.bmp
+7. Actually replace live bootloader: Copy A:\\EFI\\HackBGRT\\bootx64.efi A:\\EFI\\Microsoft\\Boot\\bootmgfw.efi
+
+Shim behavior
+1. Parse config file or UEFI shell commandline
+2. Set screen resolution (default is biggest one supported by GOP - Graphics Output Protocol)
+2. Get BGRT table
+3. Allocate image and load into memory from file
+3. Update BGRT table (or allocate new, add pointer to it to XSDT and recompute RSDP2 checksum)
+4. Recompute SDT table checksum
+5. Load Image of boot= in config (default is EFI\HackBGRT\bootmgfw-original.efi)
+6. Call BS->StartImage on that one
+
+Notes:
+- I think it should support SecureBoot if it's signed
+- Of course it'll cause BitLocker to request recovery key because the TPM banks will be different
+*/
+
+
 /**
  * HackBGRT Setup.
  */
@@ -114,6 +145,7 @@ public class Setup: SetupHelper {
 
 	/**
 	 * Install files and replace the MsLoader with our own.
+	 * The actually interesting code!
 	 */
 	protected void Install() {
 		try {
@@ -124,6 +156,7 @@ public class Setup: SetupHelper {
 			throw new SetupException("Failed to copy files to ESP!");
 		}
 		if (MsLoader.Type == BootLoaderType.MS) {
+			// 3.
 			if (!MsLoaderBackup.ReplaceWith(MsLoader)) {
 				throw new SetupException("Failed to backup MS boot loader!");
 			}
@@ -132,16 +165,20 @@ public class Setup: SetupHelper {
 			// Duplicate check, but better to be sure...
 			throw new SetupException("Failed to detect MS boot loader!");
 		}
+		// 4.
 		if (!NewLoader.ReplaceWith(NewLoaderSource)) {
 			throw new SetupException("Couldn't copy new HackBGRT to ESP.");
 		}
+		// 5.
 		if (!File.Exists(Config)) {
 			Copy(Source + "\\config.txt", Config);
 		}
+		// 6.
 		if (!File.Exists(Splash)) {
 			Copy(Source + "\\splash.bmp", Splash);
 		}
 		Configure();
+		// 7. 
 		if (!MsLoader.ReplaceWith(NewLoader)) {
 			MsLoader.ReplaceWith(MsLoaderBackup);
 			throw new SetupException("Couldn't copy new HackBGRT over the MS loader (bootmgfw.efi).");
@@ -326,7 +363,7 @@ public class Setup: SetupHelper {
 	public static void RunSetup(string source) {
 		try {
 			InitEspPath();
-			HandleSecureBoot();
+			HandleSecureBoot(); // Tell user to disable it, if enabled
 			var s = new Setup(source, Esp.Path);
 			s.HandleUserAction();
 		} catch (ExitSetup e) {

@@ -36,6 +36,7 @@ public sealed class Esp {
 
 	/**
 	 * Try to find ESP at a path.
+	 * Specifically try to find the Windows bootloader
 	 *
 	 * @param tryPath The new path to try.
 	 * @param requireMsLoader Look for MS boot loader specifically?
@@ -69,6 +70,7 @@ public sealed class Esp {
 		}
 		try {
 			// Match "The EFI System Partition is mounted at E:\" with some language support.
+			// Easy to find the ESP
 			var re = new Regex(" EFI[^\n]*(?:\n[ \t]*)?([A-Z]:)\\\\");
 			if (TryPath(re.Match(Setup.Execute("mountvol", "", false)).Groups[1].Captures[0].Value)) {
 				return true;
@@ -93,6 +95,7 @@ public sealed class Esp {
 			return true;
 		}
 		for (char c = 'A'; c <= 'Z'; ++c) {
+			// It also uses mountvol and finds the first free drive letter
 			if (Setup.Execute("mountvol", c + ": /S", true) != null) {
 				MountInstance = new Esp();
 				if (TryPath(c + ":", false)) {

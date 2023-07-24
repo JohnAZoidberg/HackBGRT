@@ -340,6 +340,7 @@ EFI_STATUS EFIAPI EfiMain(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *ST_) {
 	CHAR16 **argv;
 	int argc = GetShellArgcArgv(image_handle, &argv);
 
+    // 1.
 	if (argc <= 1) {
 		const CHAR16* config_path = L"\\EFI\\HackBGRT\\config.txt";
 		if (!ReadConfigFile(&config, root_dir, config_path)) {
